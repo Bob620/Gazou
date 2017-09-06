@@ -1,11 +1,10 @@
-const program = require('commander'),
-      fs = require('fs'),
+const fs = require('fs'),
       util = require('util'),
       EventEmitter = require('events'),
       crypto = require('crypto');
 
-
 const aws = require('aws-sdk'),
+      program = require('commander'),
       UploadStream = require('s3-upload-stream')(new aws.S3({apiVersion: '2006-03-01'})),
       FlakeId = require('flake-idgen'),
       intformat = require('biguint-format');
@@ -31,141 +30,130 @@ function processDir(directory) {
   let rootDirectory = new Directory(directory);
 
   rootDirectory.once('ready', () => {
-    discoveredTime = process.uptime() - startTime;
-    console.log(`All images discovered in ${discoveredTime} sec\nchecking images for dups...`);
+    discoveredTime = process.uptime();
+    console.log(`All images discovered in ${discoveredTime - startTime} sec\nchecking images for dups...`);
     let allImages = new Map();
 
     rootDirectory.images.forEach((newImage) => {
-      if (allImages.has(newImage.uuid)) {
-        allImages.get(newImage.uuid).occurance++;
+      if (!allImages.has(image.hash)) {
+        allImages.set(image.hash, image);
       } else {
-        const possibleImage = compareImages(allImages, newImage);
-        if (possibleImage) {
-          possibleImage.occurance++;
-        } else {
-          allImages.set(newImage.uuid, newImage);
-        }
+        const originalImage = allImages.get(image.hash);
+        originalImage.sameImages.push(image.uri);
+
+        image.tags.forEach((tag) => {
+          if (originalImage.tags.indexOf(tag) === -1) {
+            originalImage.tags.push(tag);
+          }
+        });
       }
     });
-
-    let imageRace = [];
 
     rootDirectory.directories.forEach((dir) => {
-      const tag = dir.name;
-      dir.images.forEach((newImage) => {
-        imageRace.push(new Promise((resolve, reject) => {
-          const imageStartTime = process.uptime();
-          const dupImage = compareImages(allImages, newImage);
-          const returnTime = process.uptime() - imageStartTime;
-          if (dupImage) {
-            dupImage.occurance++;
-            if (!dupImage.tags.includes(tag)) {
-              dupImage.tags.push(tag);
-            }
-            if (dupImage.uri !== newImage.uri) {
-              if (dupImage.sameImages.indexOf(newImage.uri) === -1) {
-                dupImage.sameImages.push(newImage.uri);
-              }
-            }
-          } else {
-            allImages.set(newImage.uuid, newImage);
-          }
-          resolve(returnTime);
-        }));
-      });
-    });
+      dir.images.forEach((image) => {
+        const imageStartTime = process.uptime();
+        if (!allImages.has(image.hash)) {
+          allImages.set(image.hash, image);
+        } else {
+          const originalImage = allImages.get(image.hash);
+          originalImage.sameImages.push(image.uri);
 
-    Promise.all(imageRace)
-    .then((imageTimes) => {
-      let totalImages = 0;
-      let copies = 0;
-      allImages.forEach((image) => {
-        totalImages += image.occurance;
-        if (image.occurance > 1) {
-          copies += image.occurance-1;
-        }
-      });
-
-      let imageAvgTime = 0;
-      imageTimes.forEach((time) => {
-        imageAvgTime += time;
-      });
-      imageAvgTime /= 2;
-      
-      console.log(`Images compared in ${process.uptime() - discoveredTime} sec\n`);
-      console.log(`Found ${copies} copies.\n`);
-      console.log(`Total images found: ${totalImages}`);
-      console.log(`Unique images found: ${allImages.size}\n`);
-      console.log(`Average time per image compare: ${imageAvgTime} sec`);
-      console.log(`Total time took: ${process.uptime() - startTime} sec\n`);
-/*
-      console.log('Comparing to local store...');
-      fs.readFile(`${directory}/localStore.json`, (err, data) => {
-        let localStore = new Map();
-        if (err === null) {
-          localStore = new Map(JSON.parse(data));
-        }
-
-        localStore.forEach((storedImage) => {
-
-        });
-
-        fs.writeFile(`${directory}/localStore.json`, JSON.stringify([...localStore]), (err) => {
-          if (err) {
-            console.log('Unable to update the local store');
-          } else {
-            console.log('Local store updated');
-          }
-        });
-      });
-/*
-      console.log('Uploading new images...');
-      allImages.forEach((image) => {
-        const uid = intformat(flakeId.next(), 'dec');
-        const uploadStream = UploadStream.upload({Bucket: 'i.bobco.moe', Key: `${uid}.${image.ext}`, ACL: 'public-read'});
-  
-        uploadStream.once('uploaded', (details) => {
-          const item = {
-            uid: {S: uid},
-            tags: {SS: image.tags},
-            url: {S: `${uid}.${image.ext}`}
-          }
-      
-          dynamodbWestTwo.putItem({
-            Item: item,
-            TableName: 'picturebase'
-          }, (err, data) => {
-            if (err) {
-              console.log(err);
-            } else {
-              console.log(`Uploaded successful, UID: ${uid}`);
+          image.sameImages.forEach((imageUri) => {
+            if (originalImage.sameImages.indexOf(imageUri) === -1) {
+              originalImage.sameImages.push(imageUri);
             }
           });
-        });
-  
-        fs.createReadStream(copies[0].uri)
-        .pipe(uploadStream);
-      });*/
-    });
-  });
-}
 
-function compareImages(allImages, newImage) {
-  let dupImage = false;
-  allImages.forEach((existingImage) => {
-    if (!dupImage) {
-      if (existingImage.ext === newImage.ext) {
-        if (existingImage.hash === newImage.hash) {
-          const newImageBuffer = fs.readFileSync(newImage.uri);
-          const existingImageBuffer = fs.readFileSync(existingImage.uri);
-          if (existingImageBuffer.compare(newImageBuffer) === 0) {
-            dupImage = existingImage;
-          }
+          image.tags.forEach((tag) => {
+            if (originalImage.tags.indexOf(tag) === -1) {
+              originalImage.tags.push(tag);
+            }
+          });
         }
+        const returnTime = process.uptime() - imageStartTime;
+      });
+    });
+
+    let totalImages = 0;
+    let copies = 0;
+
+    allImages.forEach((image) => {
+      const occurance = image.sameImages.length;
+      totalImages += occurance + 1;
+      if (occurance !== 0) {
+        copies += occurance;
       }
-    }
+    });
+
+    console.log(`Images compared in ${process.uptime() - discoveredTime} sec\n`);
+    console.log(`Found ${copies} copies.\n`);
+    console.log(`Total images found: ${totalImages}`);
+    console.log(`Unique images found: ${allImages.size}\n`);
+    console.log(`Total time took: ${process.uptime() - startTime} sec\n`);
+
+    console.log('Comparing to local store...');
+    fs.readFile(`${directory}/localStore.json`, (err, data) => {
+      let localStore;
+      if (err === null && data !== null) {
+        localStore = new Map(JSON.parse(data));
+      } else {
+        localStore = new Map();
+      }
+      
+      let differences = new Map();
+      updates = 0;
+
+      allImages.forEach((image, hash) => {
+        updates++;
+        if (!localStore.has(hash)) {
+          localStore.set(hash, image);
+          differences.set(hash, image);
+        } else {
+          localImage = localStore.get(hash)
+          image.uuid = localImage.uuid;
+          localStore.set(hash, image);
+        }
+      });
+
+      console.log(`${differences.size} new images since last update\n${updates} images updated`);
+
+      fs.writeFile(`${directory}/localStore.json`, JSON.stringify([...localStore]), (err) => {
+        if (err) {
+          console.log('Unable to update the local store\n');
+        } else {
+          console.log('Local store updated');
+        }
+      });
+    });
+/*
+    console.log('Uploading new images...');
+    allImages.forEach((image) => {
+      const uid = intformat(flakeId.next(), 'dec');
+      const uploadStream = UploadStream.upload({Bucket: 'i.bobco.moe', Key: `${uid}.${image.ext}`, ACL: 'public-read'});
+
+      uploadStream.once('uploaded', (details) => {
+        const item = {
+          uid: {S: uid},
+          tags: {SS: image.tags},
+          url: {S: `${uid}.${image.ext}`}
+        }
+    
+        dynamodbWestTwo.putItem({
+          Item: item,
+          TableName: 'picturebase'
+        }, (err, data) => {
+          if (err) {
+            console.log(err);
+          } else {
+            console.log(`Uploaded successful, UID: ${uid}`);
+          }
+        });
+      });
+
+      fs.createReadStream(copies[0].uri)
+      .pipe(uploadStream);
+    });*/
   });
-  return dupImage;
 }
 
 class Directory extends EventEmitter {
@@ -186,22 +174,9 @@ class Directory extends EventEmitter {
         const itemStat = fs.statSync(`${this.uri}/${itemName}`);
 
         if (itemStat.isFile() && imageRegex.test(itemName)) {
-          this.addImageFile(itemName);
+          this.addImage(itemName);
         } else if (itemStat.isDirectory()) {
           this.addDirectory(itemName);
-        }
-      });
-
-      this.images.forEach((image) => {
-        if (!image.ready) {
-          image.once('ready', () => {
-            this.processing.splice(this.processing.indexOf(image.uuid), 1);
-            if (this.processing.length === 0) {
-              this.emit('ready', this);
-            }
-          });
-        } else {
-          this.processing.splice(this.processing.indexOf(image.uuid), 1);
         }
       });
 
@@ -235,38 +210,26 @@ class Directory extends EventEmitter {
     this.processing.push(name);
   }
 
-  addImageFile(name) {
-    const uuid = intformat(flakeId.next(), 'dec')
-    this.images.set(uuid, new ImageFile(name, `${this.uri}/${name}`, {tags: [this.name], uuid}));
-    this.processing.push(uuid);
+  addImage(name) {
+    const image = new Image(name, `${this.uri}/${name}`, {tags: [this.name]});
+    if (!this.images.has(image.hash)) {
+      this.images.set(image.hash, image);
+    } else {
+      this.images.get(image.hash).sameImages.push(image.uri);
+    }
   }
 }
 
-class ImageFile extends EventEmitter{
+class Image {
   constructor(name, uri, {tags=[], uuid=intformat(flakeId.next(), 'dec')}) {
-    super();
-
     this.name = name;
     this.sameImages = [];
     this.uri = uri;
     this.uuid = uuid;
     this.tags = tags;
-    this.ext = name.substr(name.lastIndexOf('.')+1);
-    this.occurance = 1;
-    this.ready = false;
 
     const hash = crypto.createHash('md5');
-
-    const input = fs.createReadStream(uri).on('readable', () => {
-      const data = input.read();
-      if (data) {
-        hash.update(data);
-      } else {
-        this.hash = hash.digest('hex');
-        this.ready = true;
-        this.emit('ready');
-      }
-    });
+    this.hash = hash.update(fs.readFileSync(uri)).digest('hex');
   }
 }
 
