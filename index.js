@@ -4,6 +4,8 @@ const fs = require('fs'),
       crypto = require('crypto');
 
 const aws = require('aws-sdk'),
+      kagi = require('kagi');
+      aws.config.update(kagi.getChain('kagi.chn').getLink('credentials'));
       program = require('commander'),
       UploadStream = require('s3-upload-stream')(new aws.S3({apiVersion: '2006-03-01'})),
       DynamoDB = require('./DynamoDB.js'),
