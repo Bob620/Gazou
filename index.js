@@ -279,19 +279,17 @@ function processDir(directory, options) {
                         s3Upload.push(image.localCopies[0], imageUrl).then((details) => {
                           dynamodb.updateItem({
                             ExpressionAttributeNames: {
-                              '#uid': 'uid',
                               '#tags': 'tags',
                               '#url': 'url'
                             },
                             ExpressionAttributeValues: {
                               ':tags': {SS: image.tags},
-                              ':uid': {S: image.hash},
                               ':url': {S: imageUrl}
                             },
                             Key: {
                               'uid': {S: image.hash}
                             },
-                            UpdateExpression: "SET #tags = :tags, SET #uid = :uid, SET #url = :url",
+                            UpdateExpression: "SET #tags = :tags, #url = :url",
                             TableName: 'picturebase'
                           }).then((data) => {
                             uploadBar.update(maxNewUploads, ++totalUploaded);
