@@ -274,7 +274,7 @@ function processDir(directory, options) {
                     new Promise((resolve, reject) => {
                       for (let i = 0; i < maxNewUploads; i++) {
                         const image = newToSync[i];
-                        const imageUrl = image.hash + image.localCopies[0].substr(image.localCopies[0].lastIndexOf('.'));
+                        const imageUrl = image.hash + image.localCopies[0].substr(image.localCopies[0].lastIndexOf('.')).toLower();
 
                         s3Upload.push(image.localCopies[0], imageUrl).then((details) => {
                           dynamodb.updateItem({
@@ -320,7 +320,7 @@ function processDir(directory, options) {
                   new Promise((resolve, reject) => {
                     for (let i = 0; i < maxNewUploads; i++) {
                       const image = newToSync[i];
-                      const imageUrl = image.hash + image.localCopies[0].substr(image.localCopies[0].lastIndexOf('.'));
+                      const imageUrl = image.hash + image.localCopies[0].substr(image.localCopies[0].lastIndexOf('.')).toLower();
 
                       s3Upload.push(image.localCopies[0], imageUrl).then((details) => {
                         dynamodb.updateItem({
