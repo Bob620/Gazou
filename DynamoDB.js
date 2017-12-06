@@ -1,7 +1,7 @@
 const aws = require('aws-sdk');
 
 class DynamoDB {
-  constructor({maxUploadSec=5, maxDownloadSec=5, region='us-west-2', apiVersion='2012-08-10'}) {
+  constructor({maxUploadSec=5, maxDownloadSec=5, region='us-west-2', apiVersion='2012-08-10'}={}) {
     this.dynamodb = new aws.DynamoDB({apiVersion, region});
     this.maxUploadSec = maxUploadSec;
     this.maxDownloadSec = maxDownloadSec;

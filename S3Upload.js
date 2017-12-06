@@ -4,7 +4,7 @@ const aws = require('aws-sdk'),
       UploadStream = require('s3-upload-stream')(new aws.S3({apiVersion: '2006-03-01'}));
 
 class S3Upload {
-  constructor({maxUploadSec=5, bucket='i.bobco.moe', acl='public-read'}) {
+  constructor({maxUploadSec=5, bucket='i.bobco.moe', acl='public-read'}={}) {
     this.bucket = bucket;
     this.acl = acl;
     this.maxUploadSec = maxUploadSec;

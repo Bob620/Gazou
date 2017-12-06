@@ -6,15 +6,15 @@ const fs = require('fs'),
 const aws = require('aws-sdk'),
       kagi = require('kagi');
       aws.config.update(kagi.getChain('kagi.chn').getLink('credentials'));
-      program = require('commander'),
-      UploadStream = require('s3-upload-stream')(new aws.S3({apiVersion: '2006-03-01'})),
-      DynamoDB = require('./DynamoDB.js'),
+      program = require('commander');
+
+const DynamoDB = require('./DynamoDB.js'),
       S3Upload = require('./S3Upload.js'),
-      request = require('request');
+      Timing = require('./Timing.js');
 
 const readdir = util.promisify(fs.readdir),
-      dynamodb = new DynamoDB({});
-      s3Upload = new S3Upload({});
+      dynamodb = new DynamoDB(),
+      s3Upload = new S3Upload();
 
 program.version('1.0.0')
   .option('-x, --max <n>', 'An integer of the max new images to upload', parseInt)
@@ -41,17 +41,16 @@ program.version('1.0.0')
     }
 
     processDir(dir, options);
-  });
+});
 
 function processDir(directory, options) {
   console.log('Processing Directory...\n');
-  const startTime = process.uptime();
-  let discoveredTime;
+  const timing = new Timing();
   let rootDirectory = new Directory(directory);
 
   rootDirectory.once('ready', () => {
-    discoveredTime = process.uptime();
-    console.log(`All images discovered in ${discoveredTime - startTime} sec\nchecking images for dups...`);
+    timing.setNow('discoveredTime');
+    console.log(`All images discovered in ${timing.get('discoveredTime') - timing.baseTime} sec\nchecking images for dups...`);
     let allImages = new Map();
 
     rootDirectory.images.forEach((newImage) => {
@@ -76,7 +75,7 @@ function processDir(directory, options) {
 
     rootDirectory.directories.forEach((dir) => {
       dir.images.forEach((image) => {
-        const imageStartTime = process.uptime();
+        timing.setNow('imageStartTime');
         if (!allImages.has(image.hash)) {
           allImages.set(image.hash, image);
         } else {
@@ -94,7 +93,7 @@ function processDir(directory, options) {
             }
           });
         }
-        const returnTime = process.uptime() - imageStartTime;
+        timing.setRelative('returnTime', 'imageStartTime');
       });
     });
 
@@ -109,11 +108,11 @@ function processDir(directory, options) {
       }
     });
 
-    console.log(`Images compared in ${process.uptime() - discoveredTime} sec\n`);
+    console.log(`Images compared in ${timing.baseTime - timing.get('discoveredTime')} sec\n`);
     console.log(`Found ${copies} copies.\n`);
     console.log(`Total images found: ${totalImages}`);
     console.log(`Unique images found: ${allImages.size}\n`);
-    console.log(`Total time took: ${process.uptime() - startTime} sec\n`);
+    console.log(`Total time took: ${process.uptime() - timing.baseTime} sec\n`);
     
     let bigImages = rootDirectory.bigImages;
     
@@ -229,7 +228,7 @@ function processDir(directory, options) {
           fs.writeFileSync(`${directory}/localStore.json`, JSON.stringify([...localStore]));
           
           console.log('Local store updated\n');
-          console.log(`Full scan, comparison, and update completed in ${process.uptime() - startTime} sec\n`);
+          console.log(`Full scan, comparison, and update completed in ${process.uptime() - timing.baseTime} sec\n`);
 
           // Find the max number of new items to upload
           let maxNewUploads = options.max < newToSync.length ? options.max : newToSync.length;
@@ -269,183 +268,6 @@ function processDir(directory, options) {
               });
             }
           }
-/*
-          // UPDATE OLD FILES
-          // Updates all of them or none of them
-          if (options.update && diffToSync.length > 0) {
-            console.log('Updating old images...');
-            // Init progress bar
-            let totalUploaded = 0;
-            const uploadBar = new progressBar({total: diffToSync.length});
-            uploadBar.update(0);
-
-            // Handle async processes better
-            new Promise((resolve, reject) => {
-              // Sync all the images for differences
-              for (let i = 0; i < diffToSync.length; i++) {
-                const image = diffToSync[i];
-
-                // Updates the dynamodb item's tags
-                dynamodb.updateItem({
-                  ExpressionAttributeNames: {
-                    '#tags': 'tags'
-                  },
-                  ExpressionAttributeValues: {
-                    ':tags': {SS: image.tags}
-                  },
-                  Key: {
-                    'uid': {S: image.hash}
-                  },
-                  UpdateExpression: "SET #tags = :tags",
-                  TableName: 'picturebase'
-                }).then((data) => {
-                  // Updates the progress bar
-                  uploadBar.update(++totalUploaded);
-                  if (totalUploaded === diffToSync.length) {
-                    resolve();
-                  }
-                }).catch((err) => {
-                  // Error occured during update of an item
-                  // Create more in-depth logging and recovery
-                  throw err;
-                });
-              }
-            }).then(() => {
-              // Successful update of the 
-              console.log('\nOld images updated');
-              
-              // Uploads max number of new items
-              if (options.push && newToSync.length > 0) {
-                console.log('\nPushing new images...');
-
-                // Init progress bar
-                let totalUploaded = 0;
-                const uploadBar = new progressBar({total: maxNewUploads});
-                uploadBar.update(0);
-
-                // Handle async processes better
-                new Promise((resolve, reject) => {
-                  // Iterate over all the objects needingto be uploaded
-                  for (let i = 0; i < maxNewUploads; i++) {
-                    // Find the image to upload
-                    const image = newToSync[i];
-                    const imageUrl = image.hash + image.localCopies[0].substr(image.localCopies[0].lastIndexOf('.')).toLowerCase();
-
-                    // Upload the image into the S3 storage
-                    s3Upload.push(image.localCopies[0], imageUrl).then((details) => {
-                      // Once the image is uploaded, upload the dynamodb link to it
-                      dynamodb.updateItem({
-                        ExpressionAttributeNames: {
-                          '#tags': 'tags',
-                          '#url': 'url'
-                        },
-                        ExpressionAttributeValues: {
-                          ':tags': {SS: image.tags},
-                          ':url': {S: imageUrl}
-                        },
-                        Key: {
-                          'uid': {S: image.hash}
-                        },
-                        UpdateExpression: "SET #tags = :tags, #url = :url",
-                        TableName: 'picturebase'
-                      }).then((data) => {
-                        // Update the progress bar
-                        uploadBar.update(++totalUploaded);
-                        if (totalUploaded === maxNewUploads) {
-                          resolve();
-                        }
-                      }).catch((err) => {
-                        // Need better error handling and recovery
-                        throw err;
-                      });
-                    }).catch((err) => {
-                      // Need better error handling and recovery
-                      throw err;
-                    })
-                  }
-                }).then(() => {
-                  // All images uploaded successfully
-                  console.log('\nImages pushed');
-                }).catch((err) => {
-                  // Need better error handling and recovery
-                  throw err;
-                });
-              }
-            }).catch(() => {
-              // Error occurs in uploading updated tags
-            });
-          } else {
-            // Uploads max number of new items
-            if (options.push && newToSync.length > 0) {
-              console.log('\nPushing new images...');
-              // Init progress bar
-              let totalUploaded = 0;
-              const uploadBar = new progressBar({total: maxNewUploads});
-              uploadBar.update(0);
-
-              // Handle async processes better
-              new Promise((resolve, reject) => {
-                // Iterate through all images to upload
-                for (let i = 0; i < maxNewUploads; i++) {
-                  // Locate the image to upload
-                  const image = newToSync[i];
-                  const imageUrl = image.hash + image.localCopies[0].substr(image.localCopies[0].lastIndexOf('.')).toLowerCase();
-
-                  // Upload image to S3 storage
-                  s3Upload.push(image.localCopies[0], imageUrl).then((details) => {
-                    // Once the image is uploaded, upload the dynamodb link to it
-                    dynamodb.updateItem({
-                      ExpressionAttributeNames: {
-                        '#tags': 'tags',
-                        '#url': 'url'
-                      },
-                      ExpressionAttributeValues: {
-                        ':tags': {SS: image.tags},
-                        ':url': {S: imageUrl}
-                      },
-                      Key: {
-                        'uid': {S: image.hash}
-                      },
-                      UpdateExpression: "SET #tags = :tags, #url = :url",
-                      TableName: 'picturebase'
-                    }).then((data) => {
-                      // Update progress bar
-                      uploadBar.update(++totalUploaded);
-                      if (totalUploaded === maxNewUploads) {
-                        resolve();
-                      }
-                    }).catch((err) => {
-                      // Need better error handling and recovery
-                      throw err;
-                    });
-                  }).catch((err) => {
-                    // Need better error handling and recovery
-                    throw err;
-                  })
-                }
-              }).then(() => {
-                // All images uploaded successfully
-                console.log('\nImages pushed');
-              }).catch((err) => {
-                // Need better error handling and recovery
-                console.log(err);
-              });
-            }
-          }
-/*
-              console.log('Syncing new images...');
-              totalUploaded = 0;
-              uploadBar.lastLength = 0;
-
-              let interval = setInterval(() => {
-                uploadBar.update(localStore.size, totalUploaded);
-                if (localStore.size === totalUploaded) {
-                  clearInterval(interval);
-                }
-
-                totalUploaded++;
-              }, 5);
-*/
         }).catch((err) => {
           console.log(err);
         });  
@@ -453,67 +275,8 @@ function processDir(directory, options) {
         console.log(err);
       });
     });
-    
-/*
-    console.log('Uploading new images...');
-    allImages.forEach((image) => {
-      const uploadStream = UploadStream.upload({Bucket: 'i.bobco.moe', Key: `${uid}.${image.ext}`, ACL: 'public-read'});
-
-      uploadStream.once('uploaded', (details) => {
-        const item = {
-          uid: {S: uid},
-          tags: {SS: image.tags},
-          url: {S: `${uid}.${image.ext}`}
-        }
-    
-        dynamodbWestTwo.putItem({
-          Item: item,
-          TableName: 'picturebase'
-        }, (err, data) => {
-          if (err) {
-            console.log(err);
-          } else {
-            console.log(`Uploaded successful, UID: ${uid}`);
-          }
-        });
-      });
-
-      fs.createReadStream(copies[0].uri)
-      .pipe(uploadStream);
-    });*/
   });
 }
-
-
-
-
-
-/*
-for (let i = 0; i < maxNewUploads; i++) {
-  console.log('\nUploading new images...');
-  totalUploaded = 0;
-  uploadBar.update(maxNewUploads, totalUploaded);
-
-  uploadImage(newToSync[i]).then(() => {
-    uploadBar.update(maxNewUploads, ++totalUploaded);
-    if (totalUploaded === maxNewUploads) {
-      resolve();
-    }
-  });
-
-  
-  console.log('Updating old images...');
-  uploadBar.update(diffToSync.length, totalUploaded);
-
-    for (let i = 0; i < diffToSync.length; i++) {
-      const image = diffToSync[i];
-
-        uploadBar.update(diffToSync.length, ++totalUploaded);
-        if (totalUploaded === diffToSync.length) {
-          resolve();
-        }
-}
-*/
 
 function compareTags(imageOne, imageTwo) {
   for (let i = 0; i < imageOne.tags.length; i++) {
