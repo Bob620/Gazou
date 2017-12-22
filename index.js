@@ -43,60 +43,53 @@ program.version('1.0.0')
     processDir(dir, options);
 });
 
+// Compares images to find and add new ones, or add new tags to old images
+function addNewImages(dir, allImages) {
+  dir.images.forEach((image) => {
+//    timing.setNow('imageStartTime');
+    if (!allImages.has(image.hash)) {
+      allImages.set(image.hash, image);
+    } else {
+      const originalImage = allImages.get(image.hash);
+
+      image.localCopies.forEach((imageUri) => {
+        if (originalImage.localCopies.indexOf(imageUri) === -1) {
+          originalImage.localCopies.push(imageUri);
+        }
+      });
+
+      image.tags.forEach((tag) => {
+        if (originalImage.tags.indexOf(tag) === -1) {
+          originalImage.tags.push(tag);
+        }
+      });
+    }
+//    timing.setRelative('returnTime', 'imageStartTime');
+  });
+}
+
 function processDir(directory, options) {
   console.log('Processing Directory...\n');
   const timing = new Timing();
+  // Discover all Directories and Images
   let rootDirectory = new Directory(directory);
 
+  // Discovered
   rootDirectory.once('ready', () => {
-    timing.setNow('discoveredTime');
-    console.log(`All images discovered in ${timing.get('discoveredTime') - timing.baseTime} sec\nchecking images for dups...`);
+    timing.setNow('discovered');
+    console.log(`All images discovered in ${timing.getDiff('baseTime', 'discovered')} sec\nchecking images for dups...`);
+
     let allImages = new Map();
 
-    rootDirectory.images.forEach((newImage) => {
-      if (!allImages.has(image.hash)) {
-        allImages.set(image.hash, image);
-      } else {
-        const originalImage = allImages.get(image.hash);
+    // Compare images in the main directory
+    addNewImages(rootDirectory, allImages);
 
-        image.localCopies.forEach((imageUri) => {
-          if (originalImage.localCopies.indexOf(imageUri) === -1) {
-            originalImage.localCopies.push(imageUri);
-          }
-        });
-
-        image.tags.forEach((tag) => {
-          if (originalImage.tags.indexOf(tag) === -1) {
-            originalImage.tags.push(tag);
-          }
-        });
-      }
-    });
-
+    // Compare each sub-directory's images
     rootDirectory.directories.forEach((dir) => {
-      dir.images.forEach((image) => {
-        timing.setNow('imageStartTime');
-        if (!allImages.has(image.hash)) {
-          allImages.set(image.hash, image);
-        } else {
-          const originalImage = allImages.get(image.hash);
-
-          image.localCopies.forEach((imageUri) => {
-            if (originalImage.localCopies.indexOf(imageUri) === -1) {
-              originalImage.localCopies.push(imageUri);
-            }
-          });
-
-          image.tags.forEach((tag) => {
-            if (originalImage.tags.indexOf(tag) === -1) {
-              originalImage.tags.push(tag);
-            }
-          });
-        }
-        timing.setRelative('returnTime', 'imageStartTime');
-      });
+      addNewImages(dir, allImages);
     });
 
+    // Find the total number of copies (Images with more then one tag) and original images
     let totalImages = 0;
     let copies = 0;
 
@@ -108,12 +101,19 @@ function processDir(directory, options) {
       }
     });
 
-    console.log(`Images compared in ${timing.baseTime - timing.get('discoveredTime')} sec\n`);
+    /**
+     * Begin helpful info
+     */
+
+    timing.setNow('finishedComparing');
+
+    console.log(`Images compared in ${timing.getDiff('discovered', 'finishedComparing')} sec\n`);
     console.log(`Found ${copies} copies.\n`);
     console.log(`Total images found: ${totalImages}`);
     console.log(`Unique images found: ${allImages.size}\n`);
-    console.log(`Total time took: ${process.uptime() - timing.baseTime} sec\n`);
+    console.log(`Total time to load and compare: ${process.uptime() - timing.baseTime} sec\n`);
     
+    // Display the images that do not fit size requirements
     let bigImages = rootDirectory.bigImages;
     
     rootDirectory.directories.forEach((directory) => {
@@ -123,7 +123,11 @@ function processDir(directory, options) {
     console.log(`Found ${bigImages.length} images over 8MB (Max discord upload size)\n`);
     bigImages.forEach((image) => {
       console.log(image);
-    })
+    });
+
+    /**
+     * End of helpful info
+     */
 
     console.log('\nComparing to local store...');
 
@@ -158,7 +162,7 @@ function processDir(directory, options) {
       console.log(`${differences.size} new images since last update\n${updates} images updated\n`);
 
       console.log('Downloading comparison data for remote images...');
-      const startDownloadTime = process.uptime();
+      timing.setNow('downloadStart');
 
       let params = {
         TableName: 'picturebase'
@@ -187,10 +191,10 @@ function processDir(directory, options) {
 
         Promise.all(imagePromises).then(async () => {
           console.log(`Downloaded remote store containing ${remoteStore.size} images`);
-          console.log(`Remote images retrived in ${process.uptime() - startDownloadTime} secs\n`);
+          console.log(`Remote images retrived in ${process.uptime() - timing.get('downloadStart')} secs\n`);
           console.log('Comparing local and remote stores\n');
   
-          const startRemoteCompare = process.uptime();
+          timing.setNow('remoteCompareStart');
   
           let diffToSync = [];
           let newToSync = [];
@@ -213,7 +217,7 @@ function processDir(directory, options) {
             }
           });
 
-          console.log(`Remote compared in ${process.uptime() - startRemoteCompare} secs\n`);
+          console.log(`Remote compared in ${process.uptime() - timing.get('remoteCompareStart')} secs\n`);
           console.log(`Found ${remoteCopies} copies.`);
 //          console.log(`Found ${remoteUpdates} new images.`);
           console.log(`Found ${newToSync.length} new local images to sync`);

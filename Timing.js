@@ -12,6 +12,25 @@ class Timing {
     return time;
   }
 
+  getDiff(idOne, idTwo) {
+    let timeOne;
+    let timeTwo;
+    if (idOne === 'baseTime') {
+      timeOne = this.baseTime;
+    } else {
+      timeOne = this.get(idOne);
+    }
+    if (idTwo === 'baseTime') {
+      timeTwo = this.baseTime;
+    } else {
+      timeTwo = this.get(idTwo);
+    }
+
+    const diff = timeTwo - timeOne;
+
+    return diff > 0 ? diff : diff*-1
+  }
+
   setNow(id) {
     this.times.set(id, process.uptime());
   }
