@@ -1,7 +1,7 @@
-module.exports = {
+const protocols = {
 	1: {
-		messageHandle: message => {
 
-		}
 	}
 };
+
+module.exports = protocols;
