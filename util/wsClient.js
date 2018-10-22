@@ -45,6 +45,9 @@ class Client {
 
 				ws.on('close', (code, reason) => {
 					this.data.connected = false;
+					const closePromise = this.data.requests.get('connectionClosed');
+					if (closePromise)
+						closePromise.resolve(code, reason);
 				});
 
 				ws.on('error', err => {
@@ -59,7 +62,11 @@ class Client {
 
 	disconnect() {
 		if (this.data.connected)
-			this.data.ws.close();
+			return new Promise(resolve => {
+				this.data.ws.close(1000, 'User closed socket');
+				this.data.requests.set('connectionClosed', {resolve});
+			});
+		return Promise.reject('Not connected');
 	}
 
 	get(uuids) {

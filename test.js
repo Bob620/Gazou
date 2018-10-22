@@ -9,12 +9,9 @@ const fileLocation = './test/Screenshot_20170117-014953.png';
 let type = fileLocation.split('.');
 type = type[type.length-1];
 
-const testUuid = '246f2450-d5c4-11e8-be03-83ab8fc6f941';
-
 gazou.connect().then(async () => {
 	console.log('Connected');
 	try {
-
 		let hash = crypto.createHash('sha1');
 		hash.update(fs.readFileSync(fileLocation));
 		hash = hash.digest('hex');
@@ -35,11 +32,11 @@ gazou.connect().then(async () => {
 
 		await gazou.authSubmit(token);
 
-//		const {testUuid, uploadLink} = await gazou.upload(hash, type, 'someone', ['gab', 'face', 'anime']);
+		const {uuid: testUuid, uploadLink} = await gazou.upload(hash, type, 'someone', ['gab', 'face', 'anime']);
 
-//		console.log(`${testUuid} -- ${uploadLink}`);
+		console.log(`${testUuid} -- ${uploadLink}`);
 
-//		console.log(await gazou.uploadImage(uploadLink, fileLocation));
+		console.log(await gazou.uploadImage(uploadLink, fileLocation));
 
 		let initMeta = await gazou.get(testUuid);
 		initMeta = initMeta[Object.keys(initMeta)[0]];
@@ -87,11 +84,13 @@ gazou.connect().then(async () => {
 		images = await gazou.get(uuids);
 		console.log(images);
 
-//		console.log(await gazou.remove(testUuid));
+		console.log(await gazou.remove(testUuid));
 	} catch(err) {
 		console.log('\nError:');
 		console.log(err);
 	}
 
-	await gazou.disconnect();
+	console.log(await gazou.disconnect());
+
+	process.exit(0);
 });
