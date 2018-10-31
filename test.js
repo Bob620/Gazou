@@ -84,12 +84,21 @@ gazou.connect().then(async () => {
 		images = await gazou.get(uuids);
 		console.log(images);
 
+		console.log(`\nsearchRandomByArtist - ${images[initMeta.uuid].artist}`);
+		uuids = await gazou.searchRandomByArtist(images[initMeta.uuid].artist);
+		console.log(uuids);
+
+		console.log(`\nsearchRandomByTags - ${images[initMeta.uuid].tags[0]}`);
+		uuids = await gazou.searchRandomByTags([images[initMeta.uuid].tags[0]]);
+		console.log(uuids);
+
 		console.log(await gazou.remove(testUuid));
 	} catch(err) {
 		console.log('\nError:');
 		console.log(err);
 	}
 
+	console.log('');
 	console.log(await gazou.disconnect());
 
 	process.exit(0);

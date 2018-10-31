@@ -238,6 +238,42 @@ class Client {
 		return Promise.reject({message: 'not connected'});
 	}
 
+	searchRandomByArtist(artist, count, startPosition) {
+		if (artist && this.data.connected) {
+			return new Promise((resolve, reject) => {
+				const uid = nextUid().next();
+				this.send({
+					event: 'search.randomByArtist',
+					data: {
+						artist,
+						count,
+						startPosition
+					},
+					callback: uid.value
+				}, {resolve, reject});
+			});
+		}
+		return Promise.reject({message: 'not connected'});
+	}
+
+	searchRandomByTags(tags, count, startPosition) {
+		if (tags && this.data.connected) {
+			return new Promise((resolve, reject) => {
+				const uid = nextUid().next();
+				this.send({
+					event: 'search.randomByTags',
+					data: {
+						tags,
+						count,
+						startPosition
+					},
+					callback: uid.value
+				}, {resolve, reject});
+			});
+		}
+		return Promise.reject({message: 'not connected'});
+	}
+
 	uploadImage(uploadLink, imageLocation) {
 		return request.post({
 			url: uploadLink,
