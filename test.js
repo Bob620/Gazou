@@ -92,6 +92,7 @@ gazou.connect().then(async () => {
 		uuids = await gazou.searchRandomByTags([images[initMeta.uuid].tags[0]]);
 		console.log(uuids);
 
+		console.log('\n Removing image');
 		console.log(await gazou.remove(testUuid));
 	} catch(err) {
 		console.log('\nError:');
