@@ -2,8 +2,10 @@ const crypto = require('crypto');
 const fs = require('fs');
 const readline =  require('readline');
 
+const config = require('./config/config');
+
 const Gazou = require('./util/wsClient');
-const gazou = new Gazou('localhost:8080');
+const gazou = new Gazou(config.test.url);
 
 const fileLocation = './test/Screenshot_20170117-014953.png';
 let type = fileLocation.split('.');
@@ -16,7 +18,7 @@ gazou.connect().then(async () => {
 		hash.update(fs.readFileSync(fileLocation));
 		hash = hash.digest('hex');
 
-		await gazou.authInit('69096215068811264');
+		await gazou.authInit(config.test.user);
 
 		const token= await new Promise(resolve => {
 			const rl = readline.createInterface({
@@ -91,6 +93,10 @@ gazou.connect().then(async () => {
 		console.log(`\nsearchRandomByTags - ${images[initMeta.uuid].tags[0]}`);
 		uuids = await gazou.searchRandomByTags([images[initMeta.uuid].tags[0]]);
 		console.log(uuids);
+
+		console.log(`\ngetArtist - ${initMeta.artist}`);
+		let artist = await gazou.getArtist(initMeta.artist);
+		console.log(artist);
 
 		console.log('\n Removing image');
 		console.log(await gazou.remove(testUuid));
