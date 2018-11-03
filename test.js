@@ -80,11 +80,16 @@ gazou.connect().then(async () => {
 		images = await gazou.get(uuids);
 		console.log(images);
 
-		console.log(`\nsearchDateModified - ${images[initMeta.uuid].dateModified}`);
-		uuids = await gazou.searchDateModified(images[initMeta.uuid].dateModified, images[initMeta.uuid].dateModified);
-		console.log(uuids);
-		images = await gazou.get(uuids);
-		console.log(images);
+		if (images[initMeta.uuid].dateModified) {
+			console.log(`\nsearchDateModified - ${images[initMeta.uuid].dateModified}`);
+			uuids = await gazou.searchDateModified(images[initMeta.uuid].dateModified, images[initMeta.uuid].dateModified);
+			console.log(uuids);
+			images = await gazou.get(uuids);
+			console.log(images);
+		} else {
+			console.log('Unable to get date modified');
+			console.log(images[initMeta.uuid]);
+		}
 
 		console.log(`\nsearchRandomByArtist - ${images[initMeta.uuid].artist}`);
 		uuids = await gazou.searchRandomByArtist(images[initMeta.uuid].artist);
@@ -96,6 +101,14 @@ gazou.connect().then(async () => {
 
 		console.log(`\ngetArtist - ${initMeta.artist}`);
 		let artist = await gazou.getArtist(initMeta.artist);
+		console.log(artist);
+
+		console.log(`\nsetArtist - ${initMeta.artist}`);
+		artist = await gazou.setArtist(initMeta.artist, {
+			addLinks: {pixiv: 'http://pixiv.com', test: 'test'},
+			removeLinks: ['test'],
+			description: 'Hi'
+		});
 		console.log(artist);
 
 		console.log('\n Removing image');

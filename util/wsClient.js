@@ -109,6 +109,23 @@ class Client {
 		return Promise.reject({message: 'not connected'});
 	}
 
+	setArtist(artistName, metadata) {
+		if (artistName && this.data.connected) {
+			return new Promise((resolve, reject) => {
+				const uid = nextUid().next();
+				this.send({
+					event: 'setArtist',
+					data: {
+						artistName,
+						metadata
+					},
+					callback: uid.value
+				}, {resolve, reject});
+			});
+		}
+		return Promise.reject({message: 'not connected'});
+	}
+
 	remove(uuids) {
 		if (uuids && this.data.connected) {
 			return new Promise((resolve, reject) => {
