@@ -1,7 +1,7 @@
 const request = require('request-promise-native');
 const fs = require('fs');
 
-const protocols = require('./wsProtocol');
+const protocols = require('./util/wsProtocol');
 
 const WebSocket = require('ws');
 let i = 0;

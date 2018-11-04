@@ -2,9 +2,9 @@ const crypto = require('crypto');
 const fs = require('fs');
 const readline =  require('readline');
 
-const config = require('./config/config');
+const config = require('../config/config');
 
-const Gazou = require('./util/wsClient');
+const Gazou = require('../wsClient');
 const gazou = new Gazou(config.test.url);
 
 const fileLocation = './test/Screenshot_20170117-014953.png';

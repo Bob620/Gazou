@@ -2,14 +2,13 @@
   "name": "gazou-client",
   "version": "1.0.0",
   "description": "client for gazou-server 1.0.x",
-  "main": "index.js",
+  "main": "wsClient.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/test.js"
   },
   "author": "Bob620",
   "license": "MIT",
   "dependencies": {
-    "commander": "^2.19.0",
     "request": "^2.88.0",
     "request-promise-native": "^1.0.5",
     "ws": "^6.1.0"
@@ -17,5 +16,8 @@
   "optionalDependencies": {
     "bufferutil": "^4.0.0",
     "utf-8-validate": "^5.0.1"
+  },
+  "devDependencies": {
+    "commander": "^2.19.0"
   }
 }
