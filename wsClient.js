@@ -365,6 +365,30 @@ class Client {
 		return Promise.reject({message: 'not connected'});
 	}
 
+	hasHash(hashes) {
+		if (hashes && this.data.connected)
+			return new Promise((resolve, reject) => {
+				const uid = nextUid().next();
+				if (typeof hashes === 'string') {
+					this.send({
+						event: 'has.singleHash',
+						data: {
+							hash: hashes
+						},
+						callback: uid.value
+					}, {resolve, reject});
+				} else {
+					this.send({
+						event: 'has.batchHash',
+						data: {
+							hashes
+						},
+						callback: uid.value
+					}, {resolve, reject});
+				}
+			});
+	}
+
 	send(message, callback) {
 		this.data.ws.send(JSON.stringify(message));
 		this.data.requests.set(message.callback, callback);

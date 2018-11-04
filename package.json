@@ -1,6 +1,6 @@
 {
   "name": "gazou-client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "client for gazou-server 1.0.x",
   "main": "wsClient.js",
   "scripts": {
